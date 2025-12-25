@@ -1,0 +1,29 @@
+{
+  "name": "textile-billing-software",
+  "version": "1.0.0",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:react\" \"npm run dev:electron\"",
+    "dev:react": "cd renderer && npm run dev",
+    "dev:electron": "wait-on http://localhost:5173 && electron .",
+    "build": "cd renderer && npm run build"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@tailwindcss/vite": "^4.1.18",
+    "bcryptjs": "^3.0.3",
+    "electron": "^39.2.7",
+    "react-router-dom": "^7.11.0",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.7",
+    "tailwindcss": "^4.1.18"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "typescript": "^5.9.3",
+    "wait-on": "^9.0.3"
+  }
+}
