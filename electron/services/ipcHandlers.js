@@ -2,7 +2,7 @@ const { ipcMain, BrowserWindow, dialog } = require("electron");
 const dbPromise = require("../db/sqlite");
 const bcrypt = require("bcryptjs");
 const fs = require("fs");
-
+const { generateInvoiceHTML } = require("../utils/printBillView")
 
 // -------------------- RABC --------------------
 ipcMain.handle("getUserByUsername", async (_, username) => {
@@ -362,6 +362,79 @@ ipcMain.handle("createBill", async (_, bill) => {
 });
 
 
+// ipcMain.handle("printBill", async (_, bill) => {
+//   const { bill_number, customer, items, totals } = bill;
+
+//   if (!items || !Array.isArray(items)) {
+//     throw new Error("Bill items missing or invalid");
+//   }
+
+//   const printWindow = new BrowserWindow({
+//     width: 800,
+//     height: 600,
+//     show: true, // ✅ MUST be true on Wayland    
+//     webPreferences: {
+//       nodeIntegration: true,
+//       contextIsolation: false
+//     }
+//   });
+
+//   const itemsHTML = items
+//     .map(
+//       (i) =>
+//         `<tr>
+//           <td>${i.product_name}</td>
+//           <td>${i.price}</td>
+//           <td>${i.gst_percent}</td>
+//           <td>${i.quantity}</td>
+//           <td>${i.total}</td>
+//         </tr>`
+//     )
+//     .join("");
+
+//   const html = `
+//     <html>
+//       <head>
+//         <title>${bill_number}</title>
+//       </head>
+//       <body>
+//         <h2>Invoice: ${bill_number}</h2>
+//         <p>Customer: ${customer.name} (${customer.mobile})</p>
+//         <table border="1" cellspacing="0" cellpadding="5">
+//           <thead>
+//             <tr>
+//               <th>Product</th>
+//               <th>Price</th>
+//               <th>GST %</th>
+//               <th>Qty</th>
+//               <th>Total</th>
+//             </tr>
+//           </thead>
+//           <tbody>
+//             ${itemsHTML}
+//           </tbody>
+//         </table>
+//         <h3>Totals</h3>
+//         <p>Sub Total: ₹${totals.sub_total}</p>
+//         <p>GST: ₹${totals.gst_amount}</p>
+//         <p>Total: ₹${totals.total_amount}</p>
+//       </body>
+//     </html>
+//   `;
+
+//   printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURI(html)}`);
+
+//   printWindow.webContents.on("did-finish-load", () => {
+//     printWindow.webContents.print({}, (success) => {
+//       if (success) console.log("Bill printed");
+//       printWindow.close();
+//     });
+//   });
+
+//   return true;
+// });
+
+
 ipcMain.handle("printBill", async (_, bill) => {
   const { bill_number, customer, items, totals } = bill;
 
@@ -369,9 +442,48 @@ ipcMain.handle("printBill", async (_, bill) => {
     throw new Error("Bill items missing or invalid");
   }
 
+  // Default company information
+  const companyInfo = {
+    name: "G Hari Dewasi Safa House",
+    address: "Shop Address, City, State - PIN Code",
+    mobile: "+91 XXXXX XXXXX",
+    email: "info@safahouse.com",
+    gstin: "GSTIN NUMBER",
+    pan: "PAN NUMBER"
+  };
+
+  // Transform bill data to match invoice template format
+  const billData = {
+    bill_number: bill_number,
+    created_at: bill.created_at || new Date().toISOString(),
+    customer: {
+      name: customer.name || "Walk-in Customer",
+      mobile: customer.mobile || "",
+      address: customer.address || "",
+      gstin: customer.gstin || ""
+    },
+    items: items.map(item => ({
+      product_name: item.product_name,
+      hsn_code: item.hsn_code || "",
+      quantity: item.quantity,
+      rate: item.price,
+      discount: item.discount || 0,
+      gst_rate: item.gst_percent || 0,
+      total: item.total
+    })),
+    sub_total: totals.sub_total,
+    gst_amount: totals.gst_amount,
+    total_amount: totals.total_amount,
+    payment_status: bill.payment_status || "Paid",
+    payment_mode: bill.payment_mode || "Cash"
+  };
+
+  // Generate professional invoice HTML using the template
+  const html = generateInvoiceHTML(billData, companyInfo);
+
   const printWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: 900,
+    height: 650,
     show: true, // ✅ MUST be true on Wayland    
     webPreferences: {
       nodeIntegration: true,
@@ -379,61 +491,17 @@ ipcMain.handle("printBill", async (_, bill) => {
     }
   });
 
-  const itemsHTML = items
-    .map(
-      (i) =>
-        `<tr>
-          <td>${i.product_name}</td>
-          <td>${i.price}</td>
-          <td>${i.gst_percent}</td>
-          <td>${i.quantity}</td>
-          <td>${i.total}</td>
-        </tr>`
-    )
-    .join("");
-
-  const html = `
-    <html>
-      <head>
-        <title>${bill_number}</title>
-      </head>
-      <body>
-        <h2>Invoice: ${bill_number}</h2>
-        <p>Customer: ${customer.name} (${customer.mobile})</p>
-        <table border="1" cellspacing="0" cellpadding="5">
-          <thead>
-            <tr>
-              <th>Product</th>
-              <th>Price</th>
-              <th>GST %</th>
-              <th>Qty</th>
-              <th>Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${itemsHTML}
-          </tbody>
-        </table>
-        <h3>Totals</h3>
-        <p>Sub Total: ₹${totals.sub_total}</p>
-        <p>GST: ₹${totals.gst_amount}</p>
-        <p>Total: ₹${totals.total_amount}</p>
-      </body>
-    </html>
-  `;
-
-  printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURI(html)}`);
+  printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
 
   printWindow.webContents.on("did-finish-load", () => {
     printWindow.webContents.print({}, (success) => {
-      if (success) console.log("Bill printed");
+      if (success) console.log("✅ Bill printed");
       printWindow.close();
     });
   });
 
   return true;
 });
-
 
 // -------------------- Dashboard --------------------
 ipcMain.handle("getDashboardStats", async () => {
