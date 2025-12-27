@@ -32,9 +32,13 @@ export const BillingProvider = ({ children }) => {
 
   // ---------------- BILL STATE ----------------
   const [billItems, setBillItems] = useState([]);
+  const [cashDiscount, setCashDiscount] = useState(0);
+  const [paymentMode, setPaymentMode] = useState("CASH");
+  const [shouldPrint, setShouldPrint] = useState(true);
   const [totals, setTotals] = useState({
     sub_total: 0,
     gst_amount: 0,
+    cash_discount: 0,
     total_amount: 0
   });
 
@@ -126,7 +130,7 @@ export const BillingProvider = ({ children }) => {
     }
 
     setBillItems(updatedItems);
-    calculateTotals(updatedItems);
+    calculateTotals(updatedItems, cashDiscount);
 
     setProduct(null);
     setQuantity(1);
@@ -139,7 +143,7 @@ export const BillingProvider = ({ children }) => {
   const removeItem = (id) => {
     const updated = billItems.filter((i) => i.product_id !== id);
     setBillItems(updated);
-    calculateTotals(updated);
+    calculateTotals(updated, cashDiscount);
   };
 
   const getAvailableStockNumber = (id, currQuantity) => {
@@ -170,7 +174,7 @@ export const BillingProvider = ({ children }) => {
         : i
     );
     setBillItems(updated);
-    calculateTotals(updated);
+    calculateTotals(updated, cashDiscount);
   };
 
   const decreaseQuantity = (productId) => {
@@ -188,21 +192,31 @@ export const BillingProvider = ({ children }) => {
         : i
     );
     setBillItems(updated);
-    calculateTotals(updated);
+    calculateTotals(updated, cashDiscount);
+  };
+
+  // ================= DISCOUNT & PAYMENT =================
+  const handleCashDiscountChange = (discount) => {
+    const discountValue = parseFloat(discount) || 0;
+    setCashDiscount(discountValue);
+    calculateTotals(billItems, discountValue);
   };
 
   // ================= TOTALS =================
-  const calculateTotals = (items) => {
+  const calculateTotals = (items, discount = 0) => {
     const sub_total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
     const gst_amount = items.reduce(
       (sum, i) => sum + (i.price * i.quantity * i.gst_percent) / 100,
       0
     );
+    const cash_discount = parseFloat(discount) || 0;
+    const total_amount = sub_total + gst_amount - cash_discount;
 
     setTotals({
       sub_total,
       gst_amount,
-      total_amount: sub_total + gst_amount
+      cash_discount,
+      total_amount: total_amount > 0 ? total_amount : 0
     });
   };
 
@@ -218,13 +232,22 @@ export const BillingProvider = ({ children }) => {
       return;
     }
 
+    if (totals.total_amount <= 0) {
+      alert("Total amount must be greater than zero");
+      return;
+    }
+
     const bill_number = `BILL-${Date.now()}`;
 
     const result = await window.api.createBill({
       bill_number,
       customer_id: customer.id,
       items: billItems,
-      ...totals
+      sub_total: totals.sub_total,
+      gst_amount: totals.gst_amount,
+      cash_discount: totals.cash_discount,
+      total_amount: totals.total_amount,
+      payment_mode: paymentMode
     });
 
     console.log("RESULT", result);
@@ -234,18 +257,26 @@ export const BillingProvider = ({ children }) => {
       return;
     }
 
-    await window.api.printBill({
-      bill_number: bill_number,
-      customer,
-      items: billItems,
-      totals
-    });
+    // Print bill only if checkbox is checked
+    if (shouldPrint) {
+      await window.api.printBill({
+        bill_number: bill_number,
+        customer,
+        items: billItems,
+        totals: {
+          ...totals,
+          payment_mode: paymentMode
+        }
+      });
+    }
 
     console.log("***************************");
     console.log("bill_number", bill_number);
     console.log("bill_item", billItems);
     console.log("totals", totals);
+    console.log("payment_mode", paymentMode);
     console.log("customer", customer);
+    console.log("should_print", shouldPrint);
     console.log("***************************");
 
     alert(`Bill ${bill_number} created successfully`);
@@ -259,7 +290,15 @@ export const BillingProvider = ({ children }) => {
     setCustomer(null);
     setCustomerStatus("idle");
     setMobile("");
-    setTotals({ sub_total: 0, gst_amount: 0, total_amount: 0 });
+    setCashDiscount(0);
+    setPaymentMode("CASH");
+    setShouldPrint(true);
+    setTotals({ 
+      sub_total: 0, 
+      gst_amount: 0, 
+      cash_discount: 0, 
+      total_amount: 0 
+    });
     setProduct(null);
     setQuantity(1);
     setQrCode("");
@@ -304,6 +343,15 @@ export const BillingProvider = ({ children }) => {
     increaseQuantity,
     decreaseQuantity,
     calculateTotals,
+
+    // Discount & Payment
+    cashDiscount,
+    setCashDiscount,
+    handleCashDiscountChange,
+    paymentMode,
+    setPaymentMode,
+    shouldPrint,
+    setShouldPrint,
 
     // Bill generation
     generateBill,

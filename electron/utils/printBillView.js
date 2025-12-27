@@ -13,7 +13,9 @@
  * @param {Array} billData.items - Array of invoice items
  * @param {number} billData.sub_total - Subtotal amount
  * @param {number} billData.gst_amount - GST amount
+ * @param {number} billData.cash_discount - Cash discount amount (NEW)
  * @param {number} billData.total_amount - Total amount
+ * @param {string} billData.payment_mode - Payment mode (CASH/CARD/UPI) (NEW)
  * @param {Object} companyInfo - Company/Business details (optional, uses default if not provided)
  * @param {string} companyInfo.name - Company name
  * @param {string} companyInfo.address - Company address
@@ -36,6 +38,7 @@ function generateInvoiceHTML(billData, companyInfo = null) {
 
   // Use provided company info or default
   const company = companyInfo || defaultCompanyInfo;
+  
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-IN', {
@@ -90,12 +93,18 @@ function generateInvoiceHTML(billData, companyInfo = null) {
         ${item.hsn_code ? `<div style="font-size: 11px; color: #6c757d;">HSN: ${item.hsn_code}</div>` : ''}
       </td>
       <td style="padding: 10px 8px; text-align: center; border-right: 1px solid #dee2e6;">${item.quantity}</td>
-      <td style="padding: 10px 8px; text-align: right; border-right: 1px solid #dee2e6;">${formatCurrency(item.rate)}</td>
+      <td style="padding: 10px 8px; text-align: right; border-right: 1px solid #dee2e6;">${formatCurrency(item.rate || item.price)}</td>
       <td style="padding: 10px 8px; text-align: right; border-right: 1px solid #dee2e6;">${item.discount || 0}%</td>
-      <td style="padding: 10px 8px; text-align: center; border-right: 1px solid #dee2e6;">${item.gst_rate || 0}%</td>
+      <td style="padding: 10px 8px; text-align: center; border-right: 1px solid #dee2e6;">${item.gst_rate || item.gst_percent || 0}%</td>
       <td style="padding: 10px 8px; text-align: right; font-weight: 500;">${formatCurrency(item.total)}</td>
     </tr>
   `).join('');
+
+  // Get cash discount value (default to 0 if not provided)
+  const cashDiscount = billData.cash_discount || 0;
+  
+  // Get payment mode (default to CASH if not provided)
+  const paymentMode = billData.payment_mode || 'CASH';
 
   return `
     <!DOCTYPE html>
@@ -314,6 +323,12 @@ function generateInvoiceHTML(billData, companyInfo = null) {
           background: #f8f9fa;
         }
 
+        .total-row.discount {
+          background: #fff3cd;
+          color: #856404;
+          font-weight: 600;
+        }
+
         .total-row.grand-total {
           background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%);
           color: white;
@@ -327,6 +342,17 @@ function generateInvoiceHTML(billData, companyInfo = null) {
 
         .total-value {
           font-weight: 600;
+        }
+
+        .payment-mode-badge {
+          display: inline-block;
+          padding: 6px 14px;
+          background: #0066cc;
+          color: white;
+          border-radius: 20px;
+          font-weight: 600;
+          font-size: 13px;
+          letter-spacing: 0.5px;
         }
 
         .amount-in-words {
@@ -457,7 +483,7 @@ function generateInvoiceHTML(billData, companyInfo = null) {
             <div class="meta-title">Payment Information</div>
             <div class="meta-content">
               <div><strong>Payment Status:</strong> ${billData.payment_status || 'Paid'}</div>
-              <div><strong>Payment Mode:</strong> ${billData.payment_mode || 'Cash'}</div>
+              <div><strong>Payment Mode:</strong> <span class="payment-mode-badge">${paymentMode}</span></div>
             </div>
           </div>
         </div>
@@ -512,6 +538,12 @@ function generateInvoiceHTML(billData, companyInfo = null) {
               <span class="total-label">GST Amount:</span>
               <span class="total-value">${formatCurrency(billData.gst_amount)}</span>
             </div>
+            ${cashDiscount > 0 ? `
+            <div class="total-row discount">
+              <span class="total-label">Cash Discount (-):</span>
+              <span class="total-value">- ${formatCurrency(cashDiscount)}</span>
+            </div>
+            ` : ''}
             <div class="total-row grand-total">
               <span class="total-label">Total Amount:</span>
               <span class="total-value">${formatCurrency(billData.total_amount)}</span>

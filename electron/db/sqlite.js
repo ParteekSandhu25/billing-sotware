@@ -1,30 +1,3 @@
-// const sqlite3 = require("sqlite3");
-// const { open } = require("sqlite");
-
-// const dbPromise = open({
-//   filename: "textile.db",
-//   driver: sqlite3.Database
-// });
-
-// (async () => {
-//   const db = await dbPromise;
-//   await db.exec(`
-//     CREATE TABLE IF NOT EXISTS products (
-//       id INTEGER PRIMARY KEY AUTOINCREMENT,
-//       name TEXT NOT NULL,
-//       qr_code TEXT UNIQUE,
-//       price REAL NOT NULL,
-//       gst_percent REAL DEFAULT 0,
-//       quantity INTEGER DEFAULT 0,
-//       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-//     );
-//   `);
-// })();
-
-// module.exports = dbPromise;
-
-
-
 const sqlite3 = require("sqlite3");
 const { open } = require("sqlite");
 
@@ -83,11 +56,14 @@ const dbPromise = open({
       customer_id INTEGER,
       sub_total REAL NOT NULL,
       gst_amount REAL NOT NULL,
+      cash_discount REAL DEFAULT 0,
       total_amount REAL NOT NULL,
+      payment_mode TEXT NOT NULL CHECK (payment_mode IN ('CASH', 'CARD', 'UPI')),
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (customer_id) REFERENCES customers(id)
     )
   `);
+
 
   // Bill Items
   await db.exec(`

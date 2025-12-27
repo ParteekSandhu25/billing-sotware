@@ -10,7 +10,13 @@ export default function TableToolbar({
   page,
   setPage,
   totalPages,
-  placeholder = "Search..."
+  placeholder = "Search...",
+  sortOptions = [
+    { value: "newest", label: "Newest First" },
+    { value: "oldest", label: "Oldest First" },
+    { value: "az", label: "A → Z" },
+    { value: "za", label: "Z → A" }
+  ]
 }) {
   return (
     <div className="bg-white/90 backdrop-blur-lg rounded-2xl p-4 border border-slate-200 shadow-lg mb-6">
@@ -46,10 +52,11 @@ export default function TableToolbar({
                 backgroundSize: '1.5em 1.5em'
               }}
             >
-              <option value="newest">Newest First</option>
-              <option value="oldest">Oldest First</option>
-              <option value="az">A → Z</option>
-              <option value="za">Z → A</option>
+              {sortOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
           </div>
 
